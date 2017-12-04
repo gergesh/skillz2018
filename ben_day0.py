@@ -65,7 +65,7 @@ def approximated_desination():
     dis_threshold = 5
     for enemy_ship in enemy_living_pirates:
         has_found_dest = False
-        for obj_loc in allObjectsLocations:
+        for obj_loc in all_objects_locations:
             # checks what happens if it keeps on moving in its current direction:
             if enemy_ship.get_location().towards(
                     enemy_ship.get_location().add(enemy_movement_vector[enemy_ship.unique_id]),
@@ -194,75 +194,73 @@ def sort_by_distance_from(objects, location):
 
 
 def do_turn(game):
-    allObjectsLocations = \
-        [i.get_location() for i in game.get_enemy_living_pirates()].extend(
-            [j.get_location for j in game.get_all_motherships].extend(
-                [k.get_location() for k in game.get_my_living_pirates()].extend(
-                    [l.initial_location() for l in game.get_all_capsules])))
 
+    global my_capsule, enemy_capsule, my_mothership, enemy_mothership, my_living_pirates, enemy_living_pirates
+    my_capsule = PirateGame.get_my_capsule(game)
+    enemy_capsule = PirateGame.get_enemy_capsule(game)
+    my_mothership = PirateGame.get_my_mothership(game)
+    enemy_mothership = PirateGame.get_enemy_mothership(game)
+    my_living_pirates = PirateGame.get_my_living_pirates(game)
+    enemy_living_pirates = PirateGame.get_enemy_living_pirates(game)
 
-global my_capsule, enemy_capsule, my_mothership, enemy_mothership, my_living_pirates, enemy_living_pirates
-my_capsule = PirateGame.get_my_capsule(game)
-enemy_capsule = PirateGame.get_enemy_capsule(game)
-my_mothership = PirateGame.get_my_mothership(game)
-enemy_mothership = PirateGame.get_enemy_mothership(game)
-my_living_pirates = PirateGame.get_my_living_pirates(game)
-enemy_living_pirates = PirateGame.get_enemy_living_pirates(game)
+    global all_objects, all_objects_locations
+    all_objects = my_living_pirates + enemy_living_pirates.extend([my_mothership, enemy_mothership, my_capsule, enemy_capsule])
+    all_objects_locations = [i.location for i in all_objects[:-2]] + [i.initial_location for i in all_objects[-2:]]
 
-update_locations()
+    update_locations()
 
-if my_capsule.holder is None:
-    enemies_to_push = []
-    # if none of our pirates have our capsule
-    my_closest_pirate = sort_by_distance_from(my_living_pirates, my_capsule.location)[0]
-    my_closest_pirate.sail(my_capsule.location)
-    for my_pirate in sort_by_distance_from(my_living_pirates, my_closest_pirate.location)[1:3]:
-        threat = threatened_by(my_pirate)[0]
-        if threat is None:
-            my_pirate.sail(my_closest_pirate.location)
-        else:
-            my_pirate.push(threat, closest_wall(threat))
+    if my_capsule.holder is None:
+        enemies_to_push = []
+        # if none of our pirates have our capsule
+        my_closest_pirate = sort_by_distance_from(my_living_pirates, my_capsule.location)[0]
+        my_closest_pirate.sail(my_capsule.location)
+        for my_pirate in sort_by_distance_from(my_living_pirates, my_closest_pirate.location)[1:3]:
+            threat = threatened_by(my_pirate)[0]
+            if threat is None:
+                my_pirate.sail(my_closest_pirate.location)
+            else:
+                my_pirate.push(threat, closest_wall(threat))
 
-    if len(retrievers) > 2:
-        last_pirate = sort_by_distance_from(my_living_pirates, my_closest_pirate.location)[-1]
-        if threatened_by(last_pirate) is not None:
-            last_pirate.push(threatened_by(last_pirate))
-        elif last_pirate.location.distance(my_capsule.initial_location) > PICKUP_RANGE:
-            last_pirate.sail(my_capsule.initial_location.towards(my_mothership.location, PICKUP_RANGE - 1))
-            # move the closest I can to my base that will also let me pick up the capsule
-    # TODO else - protect himself
+        if len(retrievers) > 2:
+            last_pirate = sort_by_distance_from(my_living_pirates, my_closest_pirate.location)[-1]
+            if threatened_by(last_pirate) is not None:
+                last_pirate.push(threatened_by(last_pirate))
+            elif last_pirate.location.distance(my_capsule.initial_location) > PICKUP_RANGE:
+                last_pirate.sail(my_capsule.initial_location.towards(my_mothership.location, PICKUP_RANGE - 1))
+                # move the closest I can to my base that will also let me pick up the capsule
+        # TODO else - protect himself
 
-    for attacker in sort_by_distance_from(my_living_pirates, my_capsule.initial_location)[4:6]:
-        attack(attacker)
-        # TODO other pirates
-    for camper in sort_by_distance_from(my_living_pirates, my_capsule.initial_location)[6:8]:
-        camp(camper)
+        for attacker in sort_by_distance_from(my_living_pirates, my_capsule.initial_location)[4:6]:
+            attack(attacker)
+            # TODO other pirates
+        for camper in sort_by_distance_from(my_living_pirates, my_capsule.initial_location)[6:8]:
+            camp(camper)
 
-else:
-    # if we have the capsule
-    my_capsule.holder.sail(my_mothership.location)
-    enemies_to_push = []
+    else:
+        # if we have the capsule
+        my_capsule.holder.sail(my_mothership.location)
+        enemies_to_push = []
 
-    for my_pirate in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[1:2]:
-        threat = threatened_by(my_pirate)[0]
-        if threat is None:
-            my_pirate.sail(my_capsule.holder.location.towards(my_mothership.location, 200))
-        else:
-            my_pirate.push(threat, closest_wall(threat))
-    camper_pirates = sort_by_distance_from(my_living_pirates, my_capsule.holder)[2:4]
+        for my_pirate in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[1:2]:
+            threat = threatened_by(my_pirate)[0]
+            if threat is None:
+                my_pirate.sail(my_capsule.holder.location.towards(my_mothership.location, 200))
+            else:
+                my_pirate.push(threat, closest_wall(threat))
+        camper_pirates = sort_by_distance_from(my_living_pirates, my_capsule.holder)[2:4]
 
-    for camper in camper_pirates:
-        if camper.location.distance(my_capsule.initial_location) > PICKUP_RANGE:
-            camper.sail(my_capsule.initial_location)
-        else:
-            camper.sail(camper.location.add(Location(1, 0)))
+        for camper in camper_pirates:
+            if camper.location.distance(my_capsule.initial_location) > PICKUP_RANGE:
+                camper.sail(my_capsule.initial_location)
+            else:
+                camper.sail(camper.location.add(Location(1, 0)))
 
-    # TODO protect himself
+        # TODO protect himself
 
-    for attacker in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[4:6]:
-        attack(attacker)
-        # TODO other pirates
-    for camper in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[6:8]:
-        camp(camper)
+        for attacker in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[4:6]:
+            attack(attacker)
+            # TODO other pirates
+        for camper in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[6:8]:
+            camp(camper)
 
-# TODO we have two groups of campers, we should *really* find a better name for them
+    # TODO we have two groups of campers, we should *really* find a better name for them
