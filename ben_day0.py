@@ -35,7 +35,6 @@ def approximated_enemy_role(enemy_ships):
     dis_threshold = 200
     direction_threshold = 10
 
-
     dis_to_selected_target = lambda enemy_ship, target: enemy_ship.get_location().towards(
         enemy_ship.get_location().add(enemy_movement_vector[enemy_ship.unique_id]), enemy_ship.distance(target))
     for enemy_ship in enemy_ships:
@@ -76,10 +75,10 @@ def approximated_desination():
             approximated_desination[enemy_ship.unique_id] = enemy_ship.get_location()
 
 
+# There's most definitely a better way to get all things
 def loc_to_obj(location, game):
     # returns the object at the current location:
-    for thing in game.get_enemy_living_pirates().extend(
-        game.get_all_motherships.extend(game.get_my_living_pirates())):
+    for thing in enemy_living_pirates + my_capsule + enemy_capsule + my_mothership + enemy_mothership + my_living_pirates:
         if thing.location == location:
             return thing
     for capsule in game.get_all_capsules:
@@ -196,10 +195,10 @@ def sort_by_distance_from(objects, location):
 
 def do_turn(game):
     allObjectsLocations = \
-    [i.get_location() for i in game.get_enemy_living_pirates()].extend(
-        [j.get_location for j in game.get_all_motherships].extend(
-            [k.get_location() for k in game.get_my_living_pirates()].extend(
-                [l.initial_location() for l in game.get_all_capsules])))
+        [i.get_location() for i in game.get_enemy_living_pirates()].extend(
+            [j.get_location for j in game.get_all_motherships].extend(
+                [k.get_location() for k in game.get_my_living_pirates()].extend(
+                    [l.initial_location() for l in game.get_all_capsules])))
 
 
 global my_capsule, enemy_capsule, my_mothership, enemy_mothership, my_living_pirates, enemy_living_pirates
