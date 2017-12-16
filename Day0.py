@@ -1,4 +1,5 @@
 from pirates import *
+from advancedpush import *
 
 # CONSTANTS
 PICKUP_RANGE = 200
@@ -14,31 +15,25 @@ enemy_mothership = None
 my_living_pirates = None
 enemy_living_pirates = None
 
+prevlocs = {}
+directions = {}
 
-def expected_location(pirate):
+def expected_location(pirate, directions, num_of_turns = 1):
     """Receives a pirate, returns its expected location in the next turn."""
-    # some psuedo, because there's no access to the servers right now:
-    '''
-    for object in map:
-        if pirate.distance(prevturn) ~= pirate.distance(object) - prevturn.distance(object) then he's following him
-    # TODO more instructions
-    '''
-    return pirate.location.towards(directions[pirate.id], MOVE_SIZE)
+    return pirate.get_location().towards(pirate.get_location().add(directions[pirate.unique_id]), num_of_turns*MOVE_SIZE)
 
 
-def update_directions(pirates=enemy_living_pirates, d={}, prevlocs={}):
-    """A dictionary of locations, (dx, dy) in last turn"""
+def update_directions(pirates):
+    global directions, prevlocs
     for pirate in pirates:
-        if pirate.id in prevlocs:
-            d[pirate.id] = pirate.location.subtract(prevlocs[pirate.id])
-            prevlocs[pirate.id] = pirate.location
+        if pirate.unique_id in prevlocs:
+            directions[pirate.unique_id] = pirate.get_location().subtract(prevlocs[pirate.unique_id])
+            prevlocs[pirate.unique_id] = pirate.get_location()
         else:
-            d[pirate.id] = Location(0, 0)
-            prevlocs[pirate.id] = pirate.location
-    return d, prevlocs
+            directions[pirate.unique_id] = Location(0, 0)
+            prevlocs[pirate.unique_id] = pirate.get_location()
 
-
-def should_push_to(enemy_pirate):  # TODO probably incorrect calculations.
+'''def should_push_to(enemy_pirate):  # TODO probably incorrect calculations.
     """Gets an enemy pirate, returns location you should push it to."""
     # if there's no escape for him, we won't take risks with expected location.
     if not enemy_pirate.location.towards(closest_wall(enemy_pirate.location), PUSH_DISTANCE - 200).in_map:
@@ -52,9 +47,9 @@ def should_push_to(enemy_pirate):  # TODO probably incorrect calculations.
         return expected_location(enemy_pirate).subtract(enemy_mothership.location)
     else:
         # we'll just foil his plans # TODO this doesn't work as intended, need some physicist
-        return previous_locations[enemy_pirate.id].subtract(enemy_pirate.location)
-
-
+        return previous_locations[enemy_pirate.unique_id].subtract(enemy_pirate.location)
+'''
+'''
 # SHITTY FUNCTION
 def should_push_out(enemy_pirates):
     for ep in enemy_pirates:
@@ -63,10 +58,15 @@ def should_push_out(enemy_pirates):
         if not enemy_end_location.in_map:
             return ep
     return None
-
+'''
 
 def attack(ship):
     """Instruct ship to perform attacking moves."""
+    if enemy_capsule.holder is None:
+        ship.sail(enemy_mothership.get_location())
+    else:
+        ship.sail(enemy_capsule.holder)
+    '''
     if enemy_capsule.holder is None:
         # if ship.distance(PirateGame.get_enemy_capsule.initial_location)>1200:
         has_pushed = False
@@ -77,13 +77,13 @@ def attack(ship):
                 has_pushed = True
                 break
         if not has_pushed:
-            ship.sail(enemy_capsule.initial_location)
+            ship.sail(enemy_mothership.get_location())
     else:
         if ship.can_push(enemy_capsule.holder):
             push_away_from_mothership(ship, enemy_capsule.holder)
         else:
             ship.sail(enemy_capsule.holder)
-
+    '''
 
 def push_away_from_mine(ship, enemy):
     enemy_mine = enemy_capsule.initial_location
@@ -96,7 +96,7 @@ def push_away_from_mothership(my_pirate, enemy_pirate):
     enemy_mothership_vector = enemy_pirate.location.subtract(mothership)
     my_pirate.push(enemy_pirate, enemy_pirate.location.towards(enemy_mothership_vector, PUSH_DISTANCE))
 
-
+'''
 def closest_wall(obj):
     """Gets either a GameObject or a location, returns Location of nearest wall"""
     if isinstance(obj, Location):
@@ -115,16 +115,12 @@ def closest_wall(obj):
         return Location(x, 0)
     else:
         return Location(x, MAP_SIZE)
-
+'''
 
 def camp(ship):
     # for ship in ships:
-    if ship.location.distance(enemy_capsule.initial_location) > PICKUP_RANGE:
+    if ship.location.distance(enemy_capsule.initial_location) > 0:
         ship.sail(enemy_capsule.initial_location)
-    else:
-        to_push = sort_by_distance_from(enemy_living_pirates, ship)[0]
-        if ship.can_push(to_push):
-            ship.push(to_push, closest_wall(to_push))
 
 
 def retrieve(retrievers):
@@ -189,9 +185,8 @@ def threatened_by(pirate):
 
 
 def sort_by_distance_from(objects, place):
-    if not isinstance(place, Location):
-        place = place.location
-    return sorted(objects, key=lambda o: place.distance(o.location))
+    place = place.get_location()
+    return sorted(objects, key=lambda o: place.distance(o.get_location()))
 
 
 def do_turn(game):
@@ -203,16 +198,22 @@ def do_turn(game):
     enemy_mothership = PirateGame.get_enemy_mothership(game)
     my_living_pirates = PirateGame.get_my_living_pirates(game)
     enemy_living_pirates = PirateGame.get_enemy_living_pirates(game)
+    
+    update_directions(enemy_living_pirates)
+    
+    need_to_act = advanced_push(game.get_my_living_pirates(), game.get_my_capsule().holder, game.get_enemy_living_pirates(), game.get_enemy_capsule().holder, game.get_enemy_mothership(), directions)
 
-    global directions, previous_locations
-    directions, previous_locations = update_directions(enemy_living_pirates)
-
-    retrieve(my_living_pirates[:len(my_living_pirates)/2])
-
-    for attacker in sort_by_distance_from(my_living_pirates, my_capsule.location)[4:6]:
-        attack(attacker)
+    yoavs_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[0:4]
+    #retrieve(yoavs_ships)
+    
+    bens_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[4:8]
+    for attacker in sorted(bens_ships, key = lambda p: p.unique_id)[0:2]:
+        if attacker in need_to_act:
+            attack(attacker)
         # TODO other pirates
-    for camper in sort_by_distance_from(my_living_pirates, my_capsule.location)[6:8]:
-        camp(camper)
+    for camper in sorted(bens_ships, key = lambda p: p.unique_id)[2:4]:
+        if camper in need_to_act:    
+            camp(camper)
+
 
 # TODO we have two groups of campers, we should *really* find a better name for them
