@@ -18,6 +18,18 @@ enemy_living_pirates = None
 prevlocs = {}
 directions = {}
 
+def enemy_assignments(enemies, enemy_mothership, my_mothership, enemy_capsule, my_capsule):
+    num_of_enemy_gatherers = 0
+    num_of_enemy_attackers = 0
+    for enemy in enemies:
+        gather_distance = enemy.distance(enemy_mothership) + enemy.distance(enemy_capsule.initial_location)
+        attack_distance = enemy.distance(my_mothership) + enemy.distance(my_capsule.initial_location)
+        if gather_distance > attack_distance:
+            num_of_enemy_attackers += 1
+        else:
+            num_of_enemy_gatherers += 1
+    return num_of_enemy_gatherers, num_of_enemy_attackers
+
 def expected_location(pirate, directions, num_of_turns = 1):
     """Receives a pirate, returns its expected location in the next turn."""
     return pirate.get_location().towards(pirate.get_location().add(directions[pirate.unique_id]), num_of_turns*MOVE_SIZE)
@@ -201,17 +213,24 @@ def do_turn(game):
     
     update_directions(enemy_living_pirates)
     
+    num_of_enemy_gatherers, num_of_enemy_attackers = enemy_assignments(enemy_living_pirates, enemy_mothership, my_mothership, enemy_capsule, my_capsule)
+    print num_of_enemy_gatherers
+    print num_of_enemy_attackers
+    
+    num_of_my_gatherers = (len(my_living_pirates)*num_of_enemy_attackers)/(num_of_enemy_attackers+num_of_enemy_gatherers)
+    num_of_my_attackers = len(my_living_pirates) - num_of_my_gatherers
+    
     need_to_act = advanced_push(game.get_my_living_pirates(), game.get_my_capsule().holder, game.get_enemy_living_pirates(), game.get_enemy_capsule().holder, game.get_enemy_mothership(), directions)
 
-    yoavs_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[0:4]
+    yoavs_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[0:num_of_my_gatherers]
     #retrieve(yoavs_ships)
     
-    bens_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[4:8]
-    for attacker in sorted(bens_ships, key = lambda p: p.unique_id)[0:2]:
+    bens_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[num_of_my_gatherers:num_of_my_gatherers+num_of_my_attackers]
+    for attacker in sorted(bens_ships, key = lambda p: p.unique_id)[0:num_of_my_attackers/2]:
         if attacker in need_to_act:
             attack(attacker)
         # TODO other pirates
-    for camper in sorted(bens_ships, key = lambda p: p.unique_id)[2:4]:
+    for camper in sorted(bens_ships, key = lambda p: p.unique_id)[num_of_my_attackers/2:num_of_my_attackers]:
         if camper in need_to_act:    
             camp(camper)
 
