@@ -1,6 +1,7 @@
 from pirates import *
 from MyBot import *
 import math
+PUSH_RANGE = 200
 PUSH_DISTANCE = 600
 MOVE_SIZE = 200
 MAP_SIZE = 6400
@@ -65,7 +66,7 @@ def advanced_push(my_ships, team_capsule_holder, enemies, enemy_capsule_holder, 
     return ships_not_assigned
     
 def can_be_near_location(ship, location, num_of_turns):
-    if ship.get_location().distance(location) < num_of_turns * MOVE_SIZE - PUSH_DISTANCE:
+    if ship.get_location().distance(location) < num_of_turns * MOVE_SIZE - PUSH_RANGE:
         return True
     return False
 
