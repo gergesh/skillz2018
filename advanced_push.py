@@ -62,6 +62,7 @@ def advanced_push(my_ships, team_capsule_holder, enemies, enemy_capsule_holder, 
                         backwards_direction = enemy.get_location().subtract(expected_location(enemy)).multiply(1000)
                         ship.push(enemy, enemy.get_location().add(backwards_direction))
                         ships_not_assigned.remove(ship)
+                        break
                     else:
                         print "we can push the enemy out, hooray!!!"
                         for i in range(required_ships):
