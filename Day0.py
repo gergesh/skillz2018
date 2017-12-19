@@ -222,7 +222,8 @@ def do_turn(game):
     
     need_to_act = advanced_push(game.get_my_living_pirates(), game.get_my_capsule().holder, game.get_enemy_living_pirates(), game.get_enemy_capsule().holder, game.get_enemy_mothership(), directions)
 
-    yoavs_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[0:num_of_my_gatherers]
+    all_yoavs_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[0:num_of_my_gatherers]
+    yoavs_ships = [ship if ship in need_to_act for ship in all_yoavs_ships]
     retrieve(yoavs_ships)
     
     bens_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[num_of_my_gatherers:num_of_my_gatherers+num_of_my_attackers]
