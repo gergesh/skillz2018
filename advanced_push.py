@@ -6,9 +6,9 @@ PUSH_DISTANCE = 600
 MOVE_SIZE = 200
 MAP_SIZE = 6400
 
-def advanced_push(my_ships, team_capsule_holder, enemies, enemy_capsule_holder, enemy_mothership, directions):
-    global glob_directions
-    glob_directions = directions
+def advanced_push(my_ships, team_capsule_holder, enemies, enemy_capsule_holder, enemy_mothership, get_directions):
+    global directions
+    directions = get_directions
     push_together_threshold = 100
     ships_not_assigned = list(my_ships)
     enemy_ships_not_pushed = enemies
@@ -30,9 +30,9 @@ def advanced_push(my_ships, team_capsule_holder, enemies, enemy_capsule_holder, 
         else:
             if team_capsule_holder in ships_not_assigned: ships_not_assigned.remove(team_capsule_holder)
             if team_capsule_holder in closest_to_capsule_holder: closest_to_capsule_holder.remove(team_capsule_holder)
-            if can_be_near_location(closest_to_capsule_holder[1], expected_location(enemy_capsule_holder, glob_directions, move_threshold),
+            if can_be_near_location(closest_to_capsule_holder[1], expected_location(enemy_capsule_holder, move_threshold),
                                   move_threshold) and can_be_near_location(closest_to_capsule_holder[0],
-                                                                         expected_location(enemy_capsule_holder, glob_directions,
+                                                                         expected_location(enemy_capsule_holder,
                                                                                            move_threshold),
                                                                          move_threshold):
                 closest_to_capsule_holder[1].sail(enemy_capsule_holder)
@@ -53,7 +53,7 @@ def advanced_push(my_ships, team_capsule_holder, enemies, enemy_capsule_holder, 
                         ships_that_can_help += [close_ship]
                 (required_ships, _, the_wall) = can_be_pushed_to_wall(enemy) #oh yeah G.O.T
                 if required_ships>len(ships_that_can_help):
-                    backwards_direction = enemy.get_location().add(enemy.get_location().subtract(expected_location(enemy, glob_directions)).multiply(1000))
+                    backwards_direction = enemy.get_location().add(enemy.get_location().subtract(expected_location(enemy)).multiply(1000))
                     ship.push(enemy, enemy.get_location().add(backwards_direction))
                     ships_not_assigned.remove(ship)
                 else:
@@ -95,9 +95,13 @@ def get_location(obj):
     else:
         return obj.get_location()
 '''
+def expected_location(pirate, num_of_turns = 1):
+    """Receives a pirate, returns its expected location in the next turn."""
+    global directions
+    return pirate.get_location().towards(pirate.get_location().add(directions[pirate.unique_id]), num_of_turns*MOVE_SIZE)
 
 def can_be_pushed_to_wall(enemy, num_of_ships_pushing=1):
-    required_ships = int(expected_location(enemy, glob_directions).distance(closest_wall(expected_location(enemy, glob_directions)))/float(PUSH_DISTANCE)+1)
-    if expected_location(enemy, glob_directions).distance(closest_wall(expected_location(enemy, glob_directions))) < num_of_ships_pushing * PUSH_DISTANCE:
-        return required_ships, True, closest_wall(expected_location(enemy, glob_directions))
-    return required_ships, False, closest_wall(expected_location(enemy, glob_directions))
+    required_ships = int(expected_location(enemy).distance(closest_wall(expected_location(enemy)))/float(PUSH_DISTANCE)+1)
+    if expected_location(enemy).distance(closest_wall(expected_location(enemy))) < num_of_ships_pushing * PUSH_DISTANCE:
+        return required_ships, True, closest_wall(expected_location(enemy))
+    return required_ships, False, closest_wall(expected_location(enemy))
