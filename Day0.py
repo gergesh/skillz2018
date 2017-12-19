@@ -150,6 +150,7 @@ def retrieve(retrievers):
             my_closest_pirate.sail(my_capsule.get_location())
             for my_pirate in sort_by_distance_from(need_to_act, my_closest_pirate.get_location())[1:-1]:
                 my_pirate.sail(my_closest_pirate.location)
+                need_to_act.remove(my_pirate)
     
             if len(retrievers) > 2:
                 last_pirate = sort_by_distance_from(need_to_act, my_closest_pirate.location)[-1]
@@ -164,10 +165,8 @@ def retrieve(retrievers):
         for my_pirate in sort_by_distance_from(need_to_act, my_capsule.holder.location)[0:len(need_to_act)/2]:
             my_pirate.sail(my_capsule.holder.location.towards(my_mothership.location, 200))
             need_to_act.remove(my_pirate)
-        
-        camper_pirates = sort_by_distance_from(need_to_act, my_capsule.holder)[len(need_to_act)/2:len(need_to_act)]
 
-        for camper in camper_pirates:
+        for camper in sort_by_distance_from(need_to_act, my_capsule.holder)[len(need_to_act)/2:len(need_to_act)]:
             if camper.location.distance(my_capsule.initial_location) > PICKUP_RANGE:
                 camper.sail(my_capsule.initial_location)
 
