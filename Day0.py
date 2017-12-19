@@ -30,8 +30,9 @@ def enemy_assignments(enemies, enemy_mothership, my_mothership, enemy_capsule, m
             num_of_enemy_gatherers += 1
     return num_of_enemy_gatherers, num_of_enemy_attackers
 
-def expected_location(pirate, directions, num_of_turns = 1):
+def expected_location(pirate, num_of_turns = 1):
     """Receives a pirate, returns its expected location in the next turn."""
+    global directions
     return pirate.get_location().towards(pirate.get_location().add(directions[pirate.unique_id]), num_of_turns*MOVE_SIZE)
 
 
@@ -45,7 +46,7 @@ def update_directions(pirates):
             directions[pirate.unique_id] = Location(0, 0)
             prevlocs[pirate.unique_id] = pirate.get_location()
 
-'''def should_push_to(enemy_pirate):  # TODO probably incorrect calculations.
+def should_push_to(enemy_pirate):  # TODO probably incorrect calculations.
     """Gets an enemy pirate, returns location you should push it to."""
     # if there's no escape for him, we won't take risks with expected location.
     if not enemy_pirate.location.towards(closest_wall(enemy_pirate.location), PUSH_DISTANCE - 200).in_map:
@@ -60,8 +61,7 @@ def update_directions(pirates):
     else:
         # we'll just foil his plans # TODO this doesn't work as intended, need some physicist
         return previous_locations[enemy_pirate.unique_id].subtract(enemy_pirate.location)
-'''
-'''
+
 # SHITTY FUNCTION
 def should_push_out(enemy_pirates):
     for ep in enemy_pirates:
@@ -70,7 +70,7 @@ def should_push_out(enemy_pirates):
         if not enemy_end_location.in_map:
             return ep
     return None
-'''
+
 
 def attack(ship):
     """Instruct ship to perform attacking moves."""
@@ -144,7 +144,6 @@ def retrieve(retrievers):
             my_closest_pirate.sail(my_capsule.location)
         else:
             my_closest_pirate.push(threats[0], should_push_to(threats[0]))
-        threats = threatened_by(my_capsule.holder)
         for my_pirate in sort_by_distance_from(my_living_pirates, my_closest_pirate.location)[1:-1]:
             threats = threatened_by(my_pirate)
             if len(threats) == 0:
@@ -169,6 +168,7 @@ def retrieve(retrievers):
             camp(camper)
 
     else:
+        threats = threatened_by(my_capsule.holder)
         my_capsule.holder.sail(my_mothership.location)
 
         for my_pirate in sort_by_distance_from(my_living_pirates, my_capsule.holder.location)[1:2]:
@@ -193,7 +193,7 @@ def retrieve(retrievers):
 
 def threatened_by(pirate):
     """Gets a pirate, returns a list of threats."""
-    return sort_by_distance_from([i for i in enemy_living_pirates if i.can_push(pirate)], pirate.location)
+    return sort_by_distance_from([i for i in enemy_living_pirates if i.can_push(pirate)], pirate.get_location())
 
 
 def sort_by_distance_from(objects, place):
@@ -223,9 +223,10 @@ def do_turn(game):
     need_to_act = advanced_push(game.get_my_living_pirates(), game.get_my_capsule().holder, game.get_enemy_living_pirates(), game.get_enemy_capsule().holder, game.get_enemy_mothership(), directions)
 
     yoavs_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[0:num_of_my_gatherers]
-    #retrieve(yoavs_ships)
+    retrieve(yoavs_ships)
     
     bens_ships = sort_by_distance_from(my_living_pirates, my_capsule.location)[num_of_my_gatherers:num_of_my_gatherers+num_of_my_attackers]
+    
     for attacker in sorted(bens_ships, key = lambda p: p.unique_id)[0:num_of_my_attackers/2]:
         if attacker in need_to_act:
             attack(attacker)
@@ -233,6 +234,5 @@ def do_turn(game):
     for camper in sorted(bens_ships, key = lambda p: p.unique_id)[num_of_my_attackers/2:num_of_my_attackers]:
         if camper in need_to_act:    
             camp(camper)
-
 
 # TODO we have two groups of campers, we should *really* find a better name for them
