@@ -4,8 +4,8 @@ class SmartPirate(Pirate):
     def smart_sail(self, locations_and_weights, destination):
         '''Receives a list of tuples, each containing a location and its weight.'''
 
-        moves = round(self.getlocation().distance(destination.getlcoation())/MOVE_SIZE) + 1
-        _, best_destination = get_path_cost(self.getlocation(), locations_and_weights, destination, moves)
+        moves = round(self.get_location().distance(destination.get_location())/MOVE_SIZE) + 1
+        _, best_destination = get_path_cost(self.get_location(), locations_and_weights, destination, moves)
 
         def get_path_cost(self, locations_and_weights, destination, available_moves):
             if available_moves == 0:
@@ -13,9 +13,9 @@ class SmartPirate(Pirate):
             else:
                 cost_of_move = 0
                 for loc in locations_and_weights:
-                    cost_of_move += self.getlocation().distance(loc[0]) * loc[1]
+                    cost_of_move += self.get_location().distance(loc[0]) * loc[1]
 
-                if self.getlocation().distance(destination.getlcoation) < MOVE_SIZE:
+                if self.get_location().distance(destination.getlcoation) < MOVE_SIZE:
                     return cost_of_move, destination.getlcoation
                 else:
                     side_destinations = []
@@ -24,7 +24,7 @@ class SmartPirate(Pirate):
                         angle = i/number_of_possibilities*2*math.pi
                         x = int(math.cos(angle)*10000)
                         y = int(math.sin(angle)*10000)
-                        side_destinations.append(self.getlocation().towards(Location(x,y), MOVE_SIZE))
+                        side_destinations.append(self.get_location().towards(Location(x,y), MOVE_SIZE))
 
                     costs = []
                     for i in range(number_of_possibilities):
