@@ -13,6 +13,23 @@ def update_enemy_locations(game, pl, cl, mv):
         mv[i.unique_id] = cl[i.unique_id].subtract(pl[i.unique_id])
 
 
+def update_globals(game):
+    '''Should be run on the first round of the game.'''
+    p0 = game.get_my_living_pirates()[0]
+    global CAPSULE_PICKUP_RANGE; CAPSULE_PICKUP_RANGE = game.capsule_pickup_range
+    global CAPSULE_SPAWN_TURNS; CAPSULE_SPAWN_TURNS = game.capsule_spawn_turns
+    global MAP_SIZE; MAP_SIZE = game.cols
+    global MAX_POINTS; MAX_POINTS = game.max_points
+    global TURNS; TURNS = game.max_turns
+    global MOTHERSHIP_UNLOAD_RANGE; MOTHERSHIP_UNLOAD_RANGE = game.mothership_unload_range
+    global NUM_PUSHES_FOR_CAPSULE_LOSS; NUM_PUSHES_FOR_CAPSULE_LOSS = game.num_pushes_for_capsule_loss
+    global PIRATE_MAX_SPEED; PIRATE_MAX_SPEED = game.pirate_max_speed
+    global PIRATE_SPAWN_TURNS; PIRATE_SPAWN_TURNS = game.pirate_spawn_turns
+    global PUSH_DISTANCE; PUSH_DISTANCE = game.push_distance
+    global PUSH_COOLDOWN; PUSH_COOLDOWN = game.push_max_reload_turns
+    global PUSH_RANGE; PUSH_RANGE = game.push_range
+
+
 def expected_location(pirate, pl, mv, turns=1):
     '''
     :param pirate: The pirate to track.

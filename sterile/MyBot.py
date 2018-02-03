@@ -49,9 +49,26 @@ def get_all_map_locations(game):
     l = game.get_living_asteroids() + game.get_all_capsules() + game.get_my_living_pirates() + game.get_enemy_living_pirates() + game.get_all_motherships()
     return [i.get_location() for i in l]
 
+
+def update_globals(game):
+    '''Should be run on the first round of the game.'''
+    p0 = game.get_my_living_pirates()[0]
+    global CAPSULE_PICKUP_RANGE; CAPSULE_PICKUP_RANGE = game.capsule_pickup_range
+    global CAPSULE_SPAWN_TURNS; CAPSULE_SPAWN_TURNS = game.capsule_spawn_turns
+    global MAP_SIZE; MAP_SIZE = game.cols
+    global MAX_POINTS; MAX_POINTS = game.max_points
+    global TURNS; TURNS = game.max_turns
+    global MOTHERSHIP_UNLOAD_RANGE; MOTHERSHIP_UNLOAD_RANGE = game.mothership_unload_range
+    global NUM_PUSHES_FOR_CAPSULE_LOSS; NUM_PUSHES_FOR_CAPSULE_LOSS = game.num_pushes_for_capsule_loss
+    global PIRATE_MAX_SPEED; PIRATE_MAX_SPEED = game.pirate_max_speed
+    global PIRATE_SPAWN_TURNS; PIRATE_SPAWN_TURNS = game.pirate_spawn_turns
+    global PUSH_DISTANCE; PUSH_DISTANCE = game.push_distance
+    global PUSH_COOLDOWN; PUSH_COOLDOWN = game.push_max_reload_turns
+    global PUSH_RANGE; PUSH_RANGE = game.push_range
+
+
 def dbg(msg, game):
-    if DEBUG:
-        game.debug(msg)  # builtin
+    DEBUG and game.debug(msg)  # builtin
 
 
 def locations_of(*arg):
@@ -90,9 +107,10 @@ def loc_mul(loc, n):
 
 
 class SmartPirate(object):
-    def __init__(self, pirate, game):
+    def __init__(self, pirate, game, index):
         self.p = pirate
         self.g = game
+        self.i = index
 
     def smart_sail(self, locations_and_weights, destination):
         '''
@@ -181,7 +199,14 @@ class SmartPirate(object):
 
         # TODO much more
 
+
 def do_turn(game):
+
+    # update globals
+    if game.turn == 1:
+        update_globals()
+
     #update_enemy_locations(game, previous_locations, current_locations, movement_vectors)  # TODO make me work
-    for my_pirate in game.get_my_living_pirates():
-        SmartPirate(my_pirate, game).operate()
+    for index, my_pirate in enumerate(game.get_my_living_pirates(), start=1):
+        sp = SmartPirate(my_pirate, game, index)
+        sp.operate()
