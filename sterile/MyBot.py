@@ -15,7 +15,9 @@ MAX_POINTS = 8
 POINTS_LOSE_SUICIDE_THRESHOLD = int(0.8 * MAX_POINTS)  # 6
 DEBUG = True
 
-def update_enemy_locations(game, pl, cl, mv):
+# --------------------------------------------------- LIEUTENANT FUNCTIONS --------------------------------------
+
+def update_locations(game):
     '''
     :param game: the game, will be used to retrieve positions
     :param pl: previous locations.
@@ -24,25 +26,31 @@ def update_enemy_locations(game, pl, cl, mv):
     :return: nothing. The dicts are modified, no need to return them.
     '''
 
-    for i in game.get_enemy_living_pirates():
-        pl[i.unique_id] = cl[i.unique_id]
-        cl[i.unique_id] = i.get_location()
-        mv[i.unique_id] = cl[i.unique_id].subtract(pl[i.unique_id])
+    global previous_locations, current_locations, movement_vectors
+
+    for i in game.get_enemy_living_pirates() + game.get_my_living_pirates() + game.get_living_asteroids():
+        if i.unique_id in current_locations:
+            previous_locations[i.unique_id] = current_locations[i.unique_id]
+            current_locations[i.unique_id] = i.get_location()
+            movement_vectors[i.unique_id] = current_locations[i.unique_id].subtract(previous_locations[i.unique_id])
+        else:
+            current_locations[i.unique_id] = i.get_location()
+            movement_vectors[i.unique_id] = Location(0, 0)
 
 
-def expected_location(pirate, pl, mv, turns=1):
+def expected_location(pirate, turns=1):
     '''
     :param pirate: The pirate to track.
-    :param pl: A dictionary of pirate IDs and their previous locations.
-    :param mv: A dictionary of pirate IDs and their movement vectors.
     :param turns: Turns forward to anticipate.
-    :return: Location object,
+    :return: Location object
     '''
+
+    global previous_locations
     # TODO make me smarter
-    for map_location in get_all_map_locations():
-        if 198 <= pirate.get_location().distance(map_location) - pl[pirate.unique_id].distance(map_location) <= 202:
-            return pirate.towards(map_location, MOVE_SIZE*turns)
-    return pl[pirate.id].towards(pirate.get_location(), MOVE_SIZE*(turns+1))
+    for map_location in get_all_map_locations(GAME):
+        if 198 <= pirate.get_location().distance(map_location) - previous_locations[pirate.unique_id].distance(map_location) <= 202:
+            return pirate.get_location().towards(map_location, MOVE_SIZE*turns)
+    return previous_locations[pirate.unique_id].towards(pirate.get_location(), MOVE_SIZE*(turns+1))
 
 
 def get_all_map_locations(game):
@@ -99,11 +107,15 @@ def closest_wall(loc):
     else:
         return Location(x, MAP_SIZE)
 
+
 def loc_mul(loc, n):
     loc = loc.get_location()
     for _ in xrange(n):
         loc.add(n)
     return loc
+
+
+# ---------------------------------------------------- SMARTP ------------------------------------------------
 
 
 class SmartPirate(object):
@@ -178,6 +190,9 @@ class SmartPirate(object):
 
         # some things we will need
         game = self.g
+        index = self.i
+        p = self.p
+
         my_capsules = game.get_my_capsules()
         enemy_capsules = game.get_enemy_capsules()
         my_pirates = game.get_my_living_pirates()
@@ -189,24 +204,37 @@ class SmartPirate(object):
         # first of all - if we're gonna lose, let's try to make them crash. Perhaps they're dumb.
         if game.get_myself().score + POINTS_LOSE_SUICIDE_THRESHOLD <= game.get_enemy().score or (
                 game.turn > TIME_LOSE_SUICIDE_THRESHOLD and game.get_myself.score() + TIME_LOSE_SUICIDE_POINT_THRESHOLD <= game.get_enemy().score):
-            self.p.sail(closest_wall(self))
+            self.p.sail(closest_wall(self.p))
             return
 
-        if not my_capsules[0].holder is self.p:
-            self.p.sail(my_capsules[0].get_location())
+        if sort_by_distance_from(my_capsules, self.p)[0].holder is not None:  # if we have the capsule
+            if sort_by_distance_from(my_capsules, self.p)[0].holder == self.p:
+                self.p.sail(sort_by_distance_from(my_motherships, self.p)[0])
+            else:
+                self.p.sail(expected_location(my_capsules[0].holder, turns=2))
         else:
-            self.p.sail(my_motherships[0])
+            self.p.sail(sort_by_distance_from(my_capsules, self.p)[0])
 
         # TODO much more
 
 
 def do_turn(game):
+    global previous_locations, current_locations, movement_vectors, GAME
+    GAME = game
 
-    # update globals
+    #justgamestartthings
     if game.turn == 1:
-        update_globals()
+        update_globals(game)
+        previous_locations = {}
+        current_locations = {}
+        movement_vectors = {}
 
-    #update_enemy_locations(game, previous_locations, current_locations, movement_vectors)  # TODO make me work
+    # update directions
+    update_locations(game)
+
+    # Might seem stupid, but this way every pirate knows every other pirate's index.
+    smart_pirates = []
     for index, my_pirate in enumerate(game.get_my_living_pirates(), start=1):
-        sp = SmartPirate(my_pirate, game, index)
+        smart_pirates.append(SmartPirate(my_pirate, game, index))
+    for sp in smart_pirates:
         sp.operate()
