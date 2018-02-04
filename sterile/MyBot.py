@@ -34,6 +34,7 @@ def update_locations(game):
             current_locations[i.unique_id] = i.get_location()
             movement_vectors[i.unique_id] = current_locations[i.unique_id].subtract(previous_locations[i.unique_id])
         else:
+            previous_locations[i.unique_id] = i.get_location()
             current_locations[i.unique_id] = i.get_location()
             movement_vectors[i.unique_id] = Location(0, 0)
 
@@ -124,54 +125,97 @@ class SmartPirate(object):
         self.g = game
         self.i = index
 
-    def smart_sail(self, locations_and_weights, destination):
+    def smart_sail(self, destination):
         '''
         Receives a list of tuples, each containing a location and its weight.
-        Written by Ben Rapoport, is probably broken.
+        Written by Ben Rapoport, is definitely broken.
         '''
+        DANGER_MULTIPLIERS = {
+            'Pirate': 5.0,
+            'Asteroid': 1.0,
+        }
+        #print '---------------', self.p.get_location(), destination.get_location()
+        fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
+        #locations += [expected_location(i) for i in locations]
+        locations_and_weights = [(f.get_location(), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
 
-        def get_path_cost(origin, locations_and_weights, destination, available_moves):
-
-            origin, destination = locations_of(origin, destination)
-
-            if available_moves == 0:
-                return float('inf'), None
-            else:
-                cost_of_move = 0
-                for loc in locations_and_weights:
-                    cost_of_move += origin.distance(loc[0]) * loc[1]
-
-                if origin.distance(destination) < MOVE_SIZE:
-                    return cost_of_move, destination
+        def lowest_cost(loc, dest, locs_weights, rec_level=3):
+            #print '-----------', loc, dest
+            if rec_level == 0:
+                return 99999999999, Location(0,0)
+            
+            direction_options = 20
+            ANGLE_THRESHOLD = math.pi/4
+            
+            dest_vector = dest.subtract(loc)
+            dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
+            angles = [float(i)/direction_options*2*math.pi for i in range(direction_options)] + [dest_angle]
+            usable_angles = list()
+            usable_locations = list()
+            
+            for angle in angles:
+                diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
+                if diff < ANGLE_THRESHOLD:
+                    usable_angles.append(angle)
+                    
+            
+            for i, angle in enumerate(usable_angles):
+                sub_dest = loc.towards(loc.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), MOVE_SIZE)
+                '''print loc
+                print '----'
+                print sub_dest
+                print '----------'''
+                current_cost = sum([(weight/loc.distance(enemy)**2) for enemy, weight in locs_weights])
+                #current_cost += float(self.threats())*400000/self.p.get_location().distance(closest_wall(self.p))**2
+                # need to take walls into
+                if sub_dest.distance(dest) > MOVE_SIZE:
+                    usable_locations.append((current_cost + lowest_cost(sub_dest, dest, locs_weights, rec_level-1)[0], sub_dest))
                 else:
-                    side_destinations = []
-                    number_of_possibilities = 8
-                    for i in range(number_of_possibilities):
-                        angle = i / number_of_possibilities * 2 * math.pi
-                        x = int(math.cos(angle) * 10000)
-                        y = int(math.sin(angle) * 10000)
-                        side_destinations.append(origin.towards(Location(x, y), MOVE_SIZE))
+                    return current_cost, dest
+            
+            best_dest = min(usable_locations, key=lambda a: a[0])
+            return best_dest
+        
+        def lowest_cost_alt(origin, dest, locs_weights, trip_cost, step0, rec_level=3):
+            if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
+                return step0, trip_cost
 
-                    costs = []
-                    for i in range(number_of_possibilities):
-                        costs.append(
-                            get_path_cost(side_destinations[i], locations_and_weights, destination, available_moves - 1))
+            GETTING_THERE_IMPORTANCE = 200
+            DIRECTIONS = 8
+            ANGLE_THRESHOLD = math.pi/2
+            
+            dest_vector = dest.subtract(origin)
+            dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
+            
+            usable_angles = []
+            for angle in [float(i)/DIRECTIONS*2*math.pi for i in xrange(DIRECTIONS)] + [dest_angle]:
+                diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
+                if diff < ANGLE_THRESHOLD:
+                    usable_angles.append(angle)
+            
+            routes = [(origin, sum((weight+dest.distance(origin)*(1/GETTING_THERE_IMPORTANCE))/loc.distance(origin)**2+1 for loc, weight in locs_weights))] # we can just stay put, might be the best one.
+            for angle in usable_angles:
+                sub_dest = origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), MOVE_SIZE)
+                routes.append((sub_dest, sum((weight+dest.distance(sub_dest)*(1/GETTING_THERE_IMPORTANCE))/loc.distance(sub_dest)**2+1 for loc, weight in locs_weights)))
+                # a tuple containing the next immediate destination and the its cost
+            return min([lowest_cost(r[0], dest, locs_weights, r[1], step0, rec_level-1, step0=step0) for r in routes], key=lambda r: r[1])
+            print routes
+            return min(routes, key=lambda r: r[1])
 
-                    minimum = min([cost[0] for cost in costs])
-
-                    for cost in costs:
-                        if cost[0] == minimum:
-                            minimum_loc = cost[1]
-                            break
-
-                    return cost_of_move + minimum, minimum_loc
-
-        moves = round(self.p.get_location().distance(destination.get_location()) / MOVE_SIZE) + 1
-        _, best_destination = get_path_cost(self.p.get_location(), locations_and_weights, destination, moves)
-        self.p.sail(best_destination)
-
-    def threats(self, movement_vectors, turns_forward=3, rad=200):
+        max_interpolation = 5
+        if self.p.get_location().distance(destination) > max_interpolation * MOVE_SIZE:
+            destination = self.p.get_location().towards(destination.get_location(), max_interpolation * MOVE_SIZE)
+            
+            
+        rec_level = self.p.get_location().distance(destination.get_location())//MOVE_SIZE + 2
+        cost, best_dest = lowest_cost(self.p.get_location(), destination.get_location(), locations_and_weights)
+        print cost
+        self.p.sail(best_dest)
+        
+        
+    def threats(self, turns_forward=3, rad=200):
         '''Returns a list of threats, sorted by most to least critical/feasible.'''
+        global movement_vectors
         enemy_pirates = self.g.get_enemy_living_pirates()
         threats = [p for p in enemy_pirates if p.can_push(self.p)]
         for tf in xrange(1, turns_forward+1):
@@ -200,7 +244,8 @@ class SmartPirate(object):
         my_motherships = game.get_my_motherships()
         enemy_motherships = game.get_enemy_motherships()
         asteroids = game.get_living_asteroids()
-
+        
+        
         # first of all - if we're gonna lose, let's try to make them crash. Perhaps they're dumb.
         if game.get_myself().score + POINTS_LOSE_SUICIDE_THRESHOLD <= game.get_enemy().score or (
                 game.turn > TIME_LOSE_SUICIDE_THRESHOLD and game.get_myself.score() + TIME_LOSE_SUICIDE_POINT_THRESHOLD <= game.get_enemy().score):
@@ -209,16 +254,41 @@ class SmartPirate(object):
 
         if sort_by_distance_from(my_capsules, self.p)[0].holder is not None:  # if we have the capsule
             if sort_by_distance_from(my_capsules, self.p)[0].holder == self.p:
-                self.p.sail(sort_by_distance_from(my_motherships, self.p)[0])
+                self.smart_sail(sort_by_distance_from(my_motherships, self.p)[0])
             else:
-                self.p.sail(expected_location(my_capsules[0].holder, turns=2))
+                self.smart_sail(expected_location(my_capsules[0].holder, turns=2))
         else:
-            self.p.sail(sort_by_distance_from(my_capsules, self.p)[0])
+            self.smart_sail(sort_by_distance_from(my_capsules, self.p)[0])
+        
 
         # TODO much more
-
+        
+        
+    def retrieve(self):
+        pass
+    
+    
+    def wait_for_capsules(self):
+        if len(self.g.get_my_capsules()) == 1:
+            self.smart_sail(self.g.get_my_capsules()[0].initial_location)
+        else:
+            self.smart_sail(self.g.get_my_capsules()[0].initial_location)
+            pass
+            #TODO: make the ship pick the best capsule location
+        pass
+    
+    
+    def sabotage_enemy_retreiving(self):
+        pass
+    
+    
+    def sabotage_enemy_waiting(self):
+        pass
+        
+        
 
 def do_turn(game):
+    
     global previous_locations, current_locations, movement_vectors, GAME
     GAME = game
 
@@ -231,10 +301,11 @@ def do_turn(game):
 
     # update directions
     update_locations(game)
-
+    
     # Might seem stupid, but this way every pirate knows every other pirate's index.
     smart_pirates = []
     for index, my_pirate in enumerate(game.get_my_living_pirates(), start=1):
         smart_pirates.append(SmartPirate(my_pirate, game, index))
     for sp in smart_pirates:
         sp.operate()
+    
