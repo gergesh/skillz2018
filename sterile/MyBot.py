@@ -5,14 +5,24 @@ import math
 
 # CONSTANTS
 # See https://piratez.skillz-edu.org/static/c785238d5a9dbb1feea8f1b057b06393958cfe2ff34c8ee820d7bb2df4a2bc33/environment/docs/Python/PirateGame.html#capsule_pickup_range
-MOVE_SIZE = 200
-PUSH_DISTANCE = 600
-MAP_SIZE = 6400
-GAME_TURNS = 750
-TIME_LOSE_SUICIDE_THRESHOLD = int(0.8 * GAME_TURNS)
-TIME_LOSE_SUICIDE_POINT_THRESHOLD = int(0.4 * GAME_TURNS)
-MAX_POINTS = 8
-POINTS_LOSE_SUICIDE_THRESHOLD = int(0.8 * MAX_POINTS)  # 6
+CAPSULE_PICKUP_RANGE = None
+CAPSULE_SPAWN_TURNS = None
+MAP_SIZE = None
+MAX_POINTS = None
+TURNS = None
+MOTHERSHIP_UNLOAD_RANGE = None
+NUM_PUSHES_FOR_CAPSULE_LOSS = None
+PIRATE_MAX_SPEED = None
+PIRATE_SPAWN_TURNS = None
+PUSH_DISTANCE = None
+PUSH_COOLDOWN = None
+PUSH_RANGE = None
+MOVE_SIZE = None
+
+POINTS_LOSE_SUICIDE_THRESHOLD = None
+TIME_LOSE_SUICIDE_POINT_THRESHOLD = None
+TIME_LOSE_SUICIDE_THRESHOLD = None
+
 DEBUG = True
 
 # --------------------------------------------------- LIEUTENANT FUNCTIONS --------------------------------------
@@ -74,6 +84,11 @@ def update_globals(game):
     global PUSH_DISTANCE; PUSH_DISTANCE = game.push_distance
     global PUSH_COOLDOWN; PUSH_COOLDOWN = game.push_max_reload_turns
     global PUSH_RANGE; PUSH_RANGE = game.push_range
+    global MOVE_SIZE; MOVE_SIZE = game.pirate_max_speed
+    
+    global POINTS_LOSE_SUICIDE_THRESHOLD; POINTS_LOSE_SUICIDE_THRESHOLD = int(0.8 * MAX_POINTS)  # 6
+    global TIME_LOSE_SUICIDE_POINT_THRESHOLD; TIME_LOSE_SUICIDE_POINT_THRESHOLD = int(0.4 * TURNS)
+    global TIME_LOSE_SUICIDE_THRESHOLD; TIME_LOSE_SUICIDE_THRESHOLD = int(0.8 * TURNS)
 
 
 def dbg(msg, game):
