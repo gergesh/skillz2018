@@ -91,7 +91,7 @@ def update_globals(game):
     global TIME_LOSE_SUICIDE_THRESHOLD; TIME_LOSE_SUICIDE_THRESHOLD = int(0.8 * TURNS)
 
 
-def dbg(msg, game):
+def dbg(game, msg):
     DEBUG and game.debug(msg)  # builtin
 
 
@@ -153,45 +153,31 @@ class SmartPirate(object):
         fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
         #locations += [expected_location(i) for i in locations]
         locations_and_weights = [(f.get_location(), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
-
-        def lowest_cost(loc, dest, locs_weights, rec_level=3):
-            #print '-----------', loc, dest
-            if rec_level == 0:
-                return 99999999999, Location(0,0)
-            
-            direction_options = 20
-            ANGLE_THRESHOLD = math.pi/4
-            
-            dest_vector = dest.subtract(loc)
+        
+        def move_cost(from, to, goal,  
+        
+        
+        def sub_locations(origin, dest, options=8, angle=math.pi/4, move_sizes=[MOVE_SIZE, MOVE_SIZE/2]):
+            dest_vector = dest.substract(origin)
             dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
-            angles = [float(i)/direction_options*2*math.pi for i in range(direction_options)] + [dest_angle]
-            usable_angles = list()
-            usable_locations = list()
             
-            for angle in angles:
+            subs = [origin] # we can stay put
+            for angle in [float(i)/DIRECTIONS*2*math.pi for i in xrange(DIRECTIONS)] + [dest_angle]:
                 diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
                 if diff < ANGLE_THRESHOLD:
-                    usable_angles.append(angle)
-                    
-            
-            for i, angle in enumerate(usable_angles):
-                sub_dest = loc.towards(loc.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), MOVE_SIZE)
-                '''print loc
-                print '----'
-                print sub_dest
-                print '----------'''
-                current_cost = sum([(weight/loc.distance(enemy)**2) for enemy, weight in locs_weights])
-                #current_cost += float(self.threats())*400000/self.p.get_location().distance(closest_wall(self.p))**2
-                # need to take walls into
-                if sub_dest.distance(dest) > MOVE_SIZE:
-                    usable_locations.append((current_cost + lowest_cost(sub_dest, dest, locs_weights, rec_level-1)[0], sub_dest))
-                else:
-                    return current_cost, dest
-            
-            best_dest = min(usable_locations, key=lambda a: a[0])
-            return best_dest
+                    for move_size in move_sizes:
+                    subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
+            return subs
         
-        def lowest_cost_alt(origin, dest, locs_weights, trip_cost, step0, rec_level=3):
+        def best_move(origin=self.p.get_location(), dest, path=[], cost=0, rec_level=2):
+            rec_level or return path, cost
+        
+            paths = []
+            for subl in sub_locations(origin, dest):
+                paths.append(best_move(subl, dest, path + [subl], cost+move_cost(orig, subl, dest), rec_level-1)
+            return paths # a list of tuples containing paths and their costs
+        
+        def lowest_cost_alt(origin, dest, locs_weights, trip_cost, rec_level=3):
             if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
                 return step0, trip_cost
 
