@@ -148,7 +148,7 @@ class SmartPirate(object):
         DANGER_MULTIPLIERS = {
             'Pirate': 100000000.0,
             'Asteroid': 1.0,
-            'Wall': 1000000.0
+            'Wall': 1000000000.0
         }
         #print '---------------', self.p.get_location(), destination.get_location()
         fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
@@ -156,7 +156,7 @@ class SmartPirate(object):
         locations_and_weights = [(f.get_location(), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
         locations_and_weights.append((closest_wall(self.p.get_location()), DANGER_MULTIPLIERS['Wall']))
         
-        def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=8):
+        def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=50):
             advancement = origin.distance(goal) - dest.distance(goal)
             dangers_in_new_place = 0
             for lw in locations_and_weights:
@@ -164,7 +164,7 @@ class SmartPirate(object):
             # TODO find a better calculation method using the same principles
             return advancement*IMPORTANCE_OF_GETTING_THERE - dangers_in_new_place
         
-        def sub_locations(origin, dest, OPTIONS=8, ANGLE_THRESHOLD=math.pi/4, move_sizes=[MOVE_SIZE, MOVE_SIZE/2]):
+        def sub_locations(origin, dest, OPTIONS=8, ANGLE_THRESHOLD=math.pi/2, move_sizes=[MOVE_SIZE, MOVE_SIZE/2]):
             dest_vector = dest.subtract(origin)
             dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
             
@@ -174,6 +174,7 @@ class SmartPirate(object):
                 if diff < ANGLE_THRESHOLD:
                     for move_size in move_sizes:
                         subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
+            print subs
             return subs
         
         def best_move(origin, dest, locs_weights, path=[], value=0, rec_level=2):
