@@ -154,28 +154,30 @@ class SmartPirate(object):
         #locations += [expected_location(i) for i in locations]
         locations_and_weights = [(f.get_location(), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
         
-        def move_cost(from, to, goal,  
+        def move_value(dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=1):
+            dist = dest.distance(goal)
+            dangers_in_new_place = 0
+            for lw in locations_and_weights:
+                dangers_in_new_place += lw[1]/(dest.distance(lw[0])+1)**2
+            return 100/(dist*IMPORTANCE_OF_GETTING_THERE + dangers_in_new_place)
         
-        
-        def sub_locations(origin, dest, options=8, angle=math.pi/4, move_sizes=[MOVE_SIZE, MOVE_SIZE/2]):
-            dest_vector = dest.substract(origin)
+        def sub_locations(origin, dest, OPTIONS=8, ANGLE_THRESHOLD=math.pi/4, move_sizes=[MOVE_SIZE, MOVE_SIZE/2]):
+            dest_vector = dest.subtract(origin)
             dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
             
             subs = [origin] # we can stay put
-            for angle in [float(i)/DIRECTIONS*2*math.pi for i in xrange(DIRECTIONS)] + [dest_angle]:
+            for angle in [float(i)/OPTIONS*2*math.pi for i in xrange(OPTIONS)] + [dest_angle]:
                 diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
                 if diff < ANGLE_THRESHOLD:
                     for move_size in move_sizes:
-                    subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
+                        subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
             return subs
         
-        def best_move(origin=self.p.get_location(), dest, path=[], cost=0, rec_level=2):
-            rec_level or return path, cost
-        
-            paths = []
-            for subl in sub_locations(origin, dest):
-                paths.append(best_move(subl, dest, path + [subl], cost+move_cost(orig, subl, dest), rec_level-1)
-            return paths # a list of tuples containing paths and their costs
+        def best_move(origin, dest, locs_weights, path=[], rec_level=2):
+            if rec_level == 0:
+                return path, move_value(origin, dest, locs_weights)
+            sub_locs = sub_locations(origin, dest)
+            return max([best_move(subl, dest, locs_weights, path + [subl], rec_level-1) for subl in sub_locs], key=lambda x: x[1])
         
         def lowest_cost_alt(origin, dest, locs_weights, trip_cost, rec_level=3):
             if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
@@ -202,16 +204,17 @@ class SmartPirate(object):
             return min([lowest_cost(r[0], dest, locs_weights, r[1], step0, rec_level-1, step0=step0) for r in routes], key=lambda r: r[1])
             print routes
             return min(routes, key=lambda r: r[1])
-
+        '''
         max_interpolation = 5
         if self.p.get_location().distance(destination) > max_interpolation * MOVE_SIZE:
             destination = self.p.get_location().towards(destination.get_location(), max_interpolation * MOVE_SIZE)
             
             
         rec_level = self.p.get_location().distance(destination.get_location())//MOVE_SIZE + 2
-        cost, best_dest = lowest_cost(self.p.get_location(), destination.get_location(), locations_and_weights)
-        print cost
-        self.p.sail(best_dest)
+        '''
+        route, value = best_move(origin=self.p.get_location(), dest=destination.get_location(), locs_weights=locations_and_weights)
+        print value
+        self.p.sail(route[0])
         
         
     def threats(self, turns_forward=3, rad=200):
