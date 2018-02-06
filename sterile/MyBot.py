@@ -173,11 +173,11 @@ class SmartPirate(object):
                         subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
             return subs
         
-        def best_move(origin, dest, locs_weights, path=[], rec_level=2):
+        def best_move(origin, dest, locs_weights, path=[], value=0, rec_level=2):
             if rec_level == 0:
                 return path, move_value(origin, dest, locs_weights)
             sub_locs = sub_locations(origin, dest)
-            return max([best_move(subl, dest, locs_weights, path + [subl], rec_level-1) for subl in sub_locs], key=lambda x: x[1])
+            return max([best_move(subl, dest, locs_weights, path + [subl], value+move_value(subl, dest, locs_weights)rec_level-1) for subl in sub_locs], key=lambda x: x[1])
         
         def lowest_cost_alt(origin, dest, locs_weights, trip_cost, rec_level=3):
             if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
