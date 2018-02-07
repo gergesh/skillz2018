@@ -143,7 +143,7 @@ class SmartPirate(object):
     def smart_sail(self, destination):
         '''
         Receives a list of tuples, each containing a location and its weight.
-        Written by Ben Rapoport, is definitely broken.
+        Written by Yoav Shai.
         '''
         
         def generate_weights(loc, turn=0):
@@ -185,40 +185,7 @@ class SmartPirate(object):
             sub_locs = sub_locations(origin, dest)
             
             return max([best_move(subl, dest, path + [subl], value+move_value(origin, subl, dest, generate_weights(subl, len(path))), rec_level-1) for subl in sub_locs], key=lambda x: x[1])
-        
-        def lowest_cost_alt(origin, dest, locs_weights, trip_cost, rec_level=3):
-            if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
-                return step0, trip_cost
-
-            GETTING_THERE_IMPORTANCE = 200
-            DIRECTIONS = 8
-            ANGLE_THRESHOLD = math.pi/2
             
-            dest_vector = dest.subtract(origin)
-            dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
-            
-            usable_angles = []
-            for angle in [float(i)/DIRECTIONS*2*math.pi for i in xrange(DIRECTIONS)] + [dest_angle]:
-                diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
-                if diff < ANGLE_THRESHOLD:
-                    usable_angles.append(angle)
-            
-            routes = [(origin, sum((weight+dest.distance(origin)*(1/GETTING_THERE_IMPORTANCE))/loc.distance(origin)**2+1 for loc, weight in locs_weights))] # we can just stay put, might be the best one.
-            for angle in usable_angles:
-                sub_dest = origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), MOVE_SIZE)
-                routes.append((sub_dest, sum((weight+dest.distance(sub_dest)*(1/GETTING_THERE_IMPORTANCE))/loc.distance(sub_dest)**2+1 for loc, weight in locs_weights)))
-                # a tuple containing the next immediate destination and the its cost
-            return min([lowest_cost(r[0], dest, locs_weights, r[1], step0, rec_level-1, step0=step0) for r in routes], key=lambda r: r[1])
-            print routes
-            return min(routes, key=lambda r: r[1])
-        '''
-        max_interpolation = 5
-        if self.p.get_location().distance(destination) > max_interpolation * MOVE_SIZE:
-            destination = self.p.get_location().towards(destination.get_location(), max_interpolation * MOVE_SIZE)
-            
-            
-        rec_level = self.p.get_location().distance(destination.get_location())//MOVE_SIZE + 2
-        '''
         route, value = best_move(origin=self.p.get_location(), dest=destination.get_location())
         print value
         self.p.sail(route[0])
