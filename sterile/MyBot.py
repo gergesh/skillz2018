@@ -145,21 +145,23 @@ class SmartPirate(object):
         Receives a list of tuples, each containing a location and its weight.
         Written by Ben Rapoport, is definitely broken.
         '''
-        DANGER_MULTIPLIERS = {
-            'Pirate': 100000000.0,
-            'Asteroid': 1.0,
-            'Wall': 1000000000.0
-        }
-        #print '---------------', self.p.get_location(), destination.get_location()
-        fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
-        #locations += [expected_location(i) for i in locations]
-        locations_and_weights = [(f.get_location(), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
-        locations_and_weights.append((closest_wall(self.p.get_location()), DANGER_MULTIPLIERS['Wall']))
+        
+        def generate_weights(loc, turn=0):
+            DANGER_MULTIPLIERS = {
+                'Pirate': 100000000.0,
+                'Asteroid': 1.0,
+                'Wall': 1000000000.0
+            }
+            fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
+            #locations += [expected_location(i) for i in locations]
+            locations_and_weights = [(expected_location(f, turn), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
+            locations_and_weights.append((closest_wall(loc), DANGER_MULTIPLIERS['Wall']))
+            return locations_and_weights
         
         def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=50):
             advancement = origin.distance(goal) - dest.distance(goal)
             dangers_in_new_place = 0
-            for lw in locations_and_weights:
+            for lw in locs_and_weights:
                 dangers_in_new_place += lw[1]/(dest.distance(lw[0])+1)**2
             # TODO find a better calculation method using the same principles
             return advancement*IMPORTANCE_OF_GETTING_THERE - dangers_in_new_place
@@ -177,11 +179,12 @@ class SmartPirate(object):
             print subs
             return subs
         
-        def best_move(origin, dest, locs_weights, path=[], value=0, rec_level=2):
+        def best_move(origin, dest, path=[], value=0, rec_level=2):
             if rec_level == 0:
                 return path, value
             sub_locs = sub_locations(origin, dest)
-            return max([best_move(subl, dest, locs_weights, path + [subl], value+move_value(origin, subl, dest, locs_weights), rec_level-1) for subl in sub_locs], key=lambda x: x[1])
+            
+            return max([best_move(subl, dest, path + [subl], value+move_value(origin, subl, dest, generate_weights(subl, len(path))), rec_level-1) for subl in sub_locs], key=lambda x: x[1])
         
         def lowest_cost_alt(origin, dest, locs_weights, trip_cost, rec_level=3):
             if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
@@ -216,7 +219,7 @@ class SmartPirate(object):
             
         rec_level = self.p.get_location().distance(destination.get_location())//MOVE_SIZE + 2
         '''
-        route, value = best_move(origin=self.p.get_location(), dest=destination.get_location(), locs_weights=locations_and_weights)
+        route, value = best_move(origin=self.p.get_location(), dest=destination.get_location())
         print value
         self.p.sail(route[0])
         
