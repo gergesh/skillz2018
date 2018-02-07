@@ -1,5 +1,4 @@
 from pirates import *
-#from genf import * # TODO figure out how to import functions from another file, should be possible.
 import math
 
 
@@ -22,6 +21,8 @@ MOVE_SIZE = None
 POINTS_LOSE_SUICIDE_THRESHOLD = None
 TIME_LOSE_SUICIDE_POINT_THRESHOLD = None
 TIME_LOSE_SUICIDE_THRESHOLD = None
+
+THREAT_DECAY_RATE = 2
 
 DEBUG = True
 
@@ -131,6 +132,19 @@ def loc_mul(loc, n):
     return loc
 
 
+def generate_weights(loc, turn=0):
+    DANGER_MULTIPLIERS = {
+        'Pirate': 100000000.0,
+        'Asteroid': 1.0,
+        'Wall': 1000000000.0
+    }
+    fears = GAME.get_enemy_living_pirates() + GAME.get_living_asteroids()
+    #locations += [expected_location(i) for i in locations]
+    locations_and_weights = [(expected_location(f, turn), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
+    locations_and_weights.append((closest_wall(loc), DANGER_MULTIPLIERS['Wall']))
+    return locations_and_weights
+
+
 # ---------------------------------------------------- SMARTP ------------------------------------------------
 
 
@@ -142,27 +156,15 @@ class SmartPirate(object):
 
     def smart_sail(self, destination):
         '''
-        Receives a list of tuples, each containing a location and its weight.
+        Receives either a single destination or a list of possible ones, sails towards the best one.
         Written by Yoav Shai.
         '''
-        
-        def generate_weights(loc, turn=0):
-            DANGER_MULTIPLIERS = {
-                'Pirate': 100000000.0,
-                'Asteroid': 1.0,
-                'Wall': 1000000000.0
-            }
-            fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
-            #locations += [expected_location(i) for i in locations]
-            locations_and_weights = [(expected_location(f, turn), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
-            locations_and_weights.append((closest_wall(loc), DANGER_MULTIPLIERS['Wall']))
-            return locations_and_weights
         
         def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=50):
             advancement = origin.distance(goal) - dest.distance(goal)
             dangers_in_new_place = 0
             for lw in locs_and_weights:
-                dangers_in_new_place += lw[1]/(dest.distance(lw[0])+1)**2
+                dangers_in_new_place += lw[1]/(dest.distance(lw[0])+1)**THREAT_DECAY_RATE
             # TODO find a better calculation method using the same principles
             return advancement*IMPORTANCE_OF_GETTING_THERE - dangers_in_new_place
         
@@ -176,7 +178,7 @@ class SmartPirate(object):
                 if diff < ANGLE_THRESHOLD:
                     for move_size in move_sizes:
                         subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
-            print subs
+            #print subs
             return subs
         
         def best_move(origin, dest, path=[], value=0, rec_level=2):
@@ -184,10 +186,28 @@ class SmartPirate(object):
                 return path, value
             sub_locs = sub_locations(origin, dest)
             
-            return max([best_move(subl, dest, path + [subl], value+move_value(origin, subl, dest, generate_weights(subl, len(path))), rec_level-1) for subl in sub_locs], key=lambda x: x[1])
+            return max([best_move(subl, dest, path + [subl], value+move_value(origin, subl, dest, generate_weights(subl, len(path)+1)), rec_level-1) for subl in sub_locs], key=lambda x: x[1])
+            
+        if isinstance(destination, list):
+            # find the best destination using simulations
+            dests_and_diffs = []
+            for possible_target in destination:
+                possible_target = possible_target.get_location()
+                loc = self.p.get_location()
+                difficulty = 0
+                turn = 0
+                while loc != possible_target:
+                    loc = loc.towards(possible_target, self.p.max_speed)
+                    difficulty += sum(lw[1]/(loc.distance(lw[0])+1)**THREAT_DECAY_RATE for lw in generate_weights(loc, turn))
+                    difficulty += sum(lw[1]/(loc.distance(lw[0])+1)**THREAT_DECAY_RATE for lw in generate_weights(loc, 0))
+                    # adding twice, both for the ones that will be there and the ones already there
+                    turn += 1
+                difficulty += turn*140 # TODO smarter way or a better value
+                dests_and_diffs.append((possible_target, difficulty))
+            destination = min(dests_and_diffs, key=lambda x: x[1])[0]
             
         route, value = best_move(origin=self.p.get_location(), dest=destination.get_location())
-        print value
+        #print value
         self.p.sail(route[0])
         
         
@@ -232,11 +252,11 @@ class SmartPirate(object):
 
         if sort_by_distance_from(my_capsules, self.p)[0].holder is not None:  # if we have the capsule
             if sort_by_distance_from(my_capsules, self.p)[0].holder == self.p:
-                self.smart_sail(sort_by_distance_from(my_motherships, self.p)[0])
+                self.smart_sail(my_motherships)
             else:
-                self.smart_sail(expected_location(my_capsules[0].holder, turns=2))
+                self.smart_sail(expected_location(my_capsules[0].holder))
         else:
-            self.smart_sail(sort_by_distance_from(my_capsules, self.p)[0])
+            self.smart_sail(my_capsules)
         
 
         # TODO much more
@@ -266,7 +286,6 @@ class SmartPirate(object):
         
 
 def do_turn(game):
-    
     global previous_locations, current_locations, movement_vectors, GAME
     GAME = game
 
