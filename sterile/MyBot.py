@@ -22,7 +22,7 @@ POINTS_LOSE_SUICIDE_THRESHOLD = None
 TIME_LOSE_SUICIDE_POINT_THRESHOLD = None
 TIME_LOSE_SUICIDE_THRESHOLD = None
 
-THREAT_DECAY_RATE = 2
+THREAT_DECAY_RATE = 1
 
 DEBUG = True
 
@@ -92,8 +92,8 @@ def update_globals(game):
     global TIME_LOSE_SUICIDE_THRESHOLD; TIME_LOSE_SUICIDE_THRESHOLD = int(0.8 * TURNS)
 
 
-def dbg(game, msg):
-    DEBUG and game.debug(msg)  # builtin
+def dbg(msg):
+    DEBUG and GAME.debug(msg)  # builtin
 
 
 def locations_of(*arg):
@@ -134,15 +134,18 @@ def loc_mul(loc, n):
 
 def generate_weights(loc, turn=0):
     DANGER_MULTIPLIERS = {
-        'Pirate': 100000000.0,
-        'Asteroid': 1.0,
-        'Wall': 1000000000.0
+        'Pirate': 10**8.0,
+        'Asteroid': 10**8.0,
+        'Wall': 10**7.0
     }
     fears = GAME.get_enemy_living_pirates() + GAME.get_living_asteroids()
     #locations += [expected_location(i) for i in locations]
     locations_and_weights = [(expected_location(f, turn), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
     locations_and_weights.append((closest_wall(loc), DANGER_MULTIPLIERS['Wall']))
     return locations_and_weights
+    
+def closest(loc, items):
+    return sort_by_distance_from(items, loc.get_location())[0]
 
 
 # ---------------------------------------------------- SMARTP ------------------------------------------------
@@ -160,7 +163,7 @@ class SmartPirate(object):
         Written by Yoav Shai.
         '''
         
-        def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=50):
+        def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=5000):
             advancement = origin.distance(goal) - dest.distance(goal)
             dangers_in_new_place = 0
             for lw in locs_and_weights:
@@ -202,7 +205,7 @@ class SmartPirate(object):
                     difficulty += sum(lw[1]/(loc.distance(lw[0])+1)**THREAT_DECAY_RATE for lw in generate_weights(loc, 0))
                     # adding twice, both for the ones that will be there and the ones already there
                     turn += 1
-                difficulty += turn*140 # TODO smarter way or a better value
+                difficulty += turn*300 # TODO smarter way or a better value
                 dests_and_diffs.append((possible_target, difficulty))
             destination = min(dests_and_diffs, key=lambda x: x[1])[0]
             
@@ -241,15 +244,55 @@ class SmartPirate(object):
         enemy_pirates = game.get_enemy_living_pirates()
         my_motherships = game.get_my_motherships()
         enemy_motherships = game.get_enemy_motherships()
+        my_mines = [c.initial_location for c in my_capsules]
+        enemy_mines = [c.initial_location for c in enemy_capsules]
         asteroids = game.get_living_asteroids()
         
-        
+
         # first of all - if we're gonna lose, let's try to make them crash. Perhaps they're dumb.
         if game.get_myself().score + POINTS_LOSE_SUICIDE_THRESHOLD <= game.get_enemy().score or (
-                game.turn > TIME_LOSE_SUICIDE_THRESHOLD and game.get_myself.score() + TIME_LOSE_SUICIDE_POINT_THRESHOLD <= game.get_enemy().score):
+                game.turn > TIME_LOSE_SUICIDE_THRESHOLD and game.get_myself().score + TIME_LOSE_SUICIDE_POINT_THRESHOLD <= game.get_enemy().score):
             self.p.sail(closest_wall(self.p))
             return
-
+        print len(my_capsules)
+        if len(my_capsules) == 0: # one man army
+            if len(enemy_pirates) == 1:
+                if self.p.can_push(enemy_pirates[0]):
+                    self.p.push(enemy_pirates[0], closest_wall(enemy_pirates[0]))
+            else:
+                for ep in enemy_pirates:
+                    if ep.capsule is not None and self.p.can_push(ep):
+                        self.p.push(ep, closest_wall(ep))
+            return
+                
+        if self.p.capsule is not None:
+            # if I have a capsule
+            threats = self.threats(turns_forward=0, rad=PUSH_RANGE)
+            if len(threats) == 0:
+                self.smart_sail(my_motherships)
+            else:
+                for t in threats:
+                    if self.p.can_push(t):
+                        self.p.push(t, closest_wall(t))
+                        return
+                else:
+                    self.smart_sail(my_motherships)
+            return
+        # if I don't have a capsule
+        closest_capsule = closest(self.p, my_capsules)
+        index_from_capsule = sort_by_distance_from(my_pirates, closest_capsule).index(self.p)
+        if index_from_capsule == 0:
+            self.smart_sail(closest_capsule)
+        elif index_from_capsule > len(my_pirates)/2:
+            if closest(self.p, enemy_capsules).holder is not None:
+                # if their capsule has a holder
+                self.smart_sail(closest(self.p, enemy_capsules))
+            else:
+                self.smart_sail(closest(self.p, enemy_mines))
+        else:
+            self.smart_sail(closest(self.p, my_capsules))
+        return            
+        '''
         if sort_by_distance_from(my_capsules, self.p)[0].holder is not None:  # if we have the capsule
             if sort_by_distance_from(my_capsules, self.p)[0].holder == self.p:
                 self.smart_sail(my_motherships)
@@ -257,8 +300,11 @@ class SmartPirate(object):
                 self.smart_sail(expected_location(my_capsules[0].holder))
         else:
             self.smart_sail(my_capsules)
-        
 
+        for ep in enemy_pirates:
+            if ep.capsule is not None and self.p.can_push(ep):
+                self.p.push(ep, closest_wall(ep))
+        '''
         # TODO much more
         
         
