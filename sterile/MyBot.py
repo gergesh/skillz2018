@@ -1,5 +1,4 @@
 from pirates import *
-#from genf import * # TODO figure out how to import functions from another file, should be possible.
 import math
 
 
@@ -22,6 +21,8 @@ MOVE_SIZE = None
 POINTS_LOSE_SUICIDE_THRESHOLD = None
 TIME_LOSE_SUICIDE_POINT_THRESHOLD = None
 TIME_LOSE_SUICIDE_THRESHOLD = None
+
+THREAT_DECAY_RATE = 1
 
 DEBUG = True
 
@@ -91,8 +92,8 @@ def update_globals(game):
     global TIME_LOSE_SUICIDE_THRESHOLD; TIME_LOSE_SUICIDE_THRESHOLD = int(0.8 * TURNS)
 
 
-def dbg(msg, game):
-    DEBUG and game.debug(msg)  # builtin
+def dbg(msg):
+    DEBUG and GAME.debug(msg)  # builtin
 
 
 def locations_of(*arg):
@@ -131,6 +132,22 @@ def loc_mul(loc, n):
     return loc
 
 
+def generate_weights(loc, turn=0):
+    DANGER_MULTIPLIERS = {
+        'Pirate': 10**8.0,
+        'Asteroid': 10**8.0,
+        'Wall': 10**7.0
+    }
+    fears = GAME.get_enemy_living_pirates() + GAME.get_living_asteroids()
+    #locations += [expected_location(i) for i in locations]
+    locations_and_weights = [(expected_location(f, turn), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
+    locations_and_weights.append((closest_wall(loc), DANGER_MULTIPLIERS['Wall']))
+    return locations_and_weights
+    
+def closest(loc, items):
+    return sort_by_distance_from(items, loc.get_location())[0]
+
+
 # ---------------------------------------------------- SMARTP ------------------------------------------------
 
 
@@ -142,90 +159,59 @@ class SmartPirate(object):
 
     def smart_sail(self, destination):
         '''
-        Receives a list of tuples, each containing a location and its weight.
-        Written by Ben Rapoport, is definitely broken.
+        Receives either a single destination or a list of possible ones, sails towards the best one.
+        Written by Yoav Shai.
         '''
-        DANGER_MULTIPLIERS = {
-            'Pirate': 5.0,
-            'Asteroid': 1.0,
-        }
-        #print '---------------', self.p.get_location(), destination.get_location()
-        fears = self.g.get_enemy_living_pirates() + self.g.get_living_asteroids()
-        #locations += [expected_location(i) for i in locations]
-        locations_and_weights = [(f.get_location(), DANGER_MULTIPLIERS[type(f).__name__]) for f in fears]
-
-        def lowest_cost(loc, dest, locs_weights, rec_level=3):
-            #print '-----------', loc, dest
-            if rec_level == 0:
-                return 99999999999, Location(0,0)
-            
-            direction_options = 20
-            ANGLE_THRESHOLD = math.pi/4
-            
-            dest_vector = dest.subtract(loc)
-            dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
-            angles = [float(i)/direction_options*2*math.pi for i in range(direction_options)] + [dest_angle]
-            usable_angles = list()
-            usable_locations = list()
-            
-            for angle in angles:
-                diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
-                if diff < ANGLE_THRESHOLD:
-                    usable_angles.append(angle)
-                    
-            
-            for i, angle in enumerate(usable_angles):
-                sub_dest = loc.towards(loc.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), MOVE_SIZE)
-                '''print loc
-                print '----'
-                print sub_dest
-                print '----------'''
-                current_cost = sum([(weight/loc.distance(enemy)**2) for enemy, weight in locs_weights])
-                #current_cost += float(self.threats())*400000/self.p.get_location().distance(closest_wall(self.p))**2
-                # need to take walls into
-                if sub_dest.distance(dest) > MOVE_SIZE:
-                    usable_locations.append((current_cost + lowest_cost(sub_dest, dest, locs_weights, rec_level-1)[0], sub_dest))
-                else:
-                    return current_cost, dest
-            
-            best_dest = min(usable_locations, key=lambda a: a[0])
-            return best_dest
         
-        def lowest_cost_alt(origin, dest, locs_weights, trip_cost, step0, rec_level=3):
-            if rec_level == 0 or dest.distance(origin) < MOVE_SIZE:
-                return step0, trip_cost
-
-            GETTING_THERE_IMPORTANCE = 200
-            DIRECTIONS = 8
-            ANGLE_THRESHOLD = math.pi/2
-            
+        def move_value(origin, dest, goal, locs_and_weights, IMPORTANCE_OF_GETTING_THERE=5000):
+            advancement = origin.distance(goal) - dest.distance(goal)
+            dangers_in_new_place = 0
+            for lw in locs_and_weights:
+                dangers_in_new_place += lw[1]/(dest.distance(lw[0])+1)**THREAT_DECAY_RATE
+            # TODO find a better calculation method using the same principles
+            return advancement*IMPORTANCE_OF_GETTING_THERE - dangers_in_new_place
+        
+        def sub_locations(origin, dest, OPTIONS=8, ANGLE_THRESHOLD=math.pi/2, move_sizes=[MOVE_SIZE, MOVE_SIZE/2]):
             dest_vector = dest.subtract(origin)
             dest_angle = math.atan2(dest_vector.get_location().col, dest_vector.get_location().row)
             
-            usable_angles = []
-            for angle in [float(i)/DIRECTIONS*2*math.pi for i in xrange(DIRECTIONS)] + [dest_angle]:
+            subs = [origin] # we can stay put
+            for angle in [float(i)/OPTIONS*2*math.pi for i in xrange(OPTIONS)] + [dest_angle]:
                 diff = abs((angle+2*math.pi)%(2*math.pi)-(dest_angle+2*math.pi)%(2*math.pi))
                 if diff < ANGLE_THRESHOLD:
-                    usable_angles.append(angle)
+                    for move_size in move_sizes:
+                        subs.append(origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), move_size))
+            #print subs
+            return subs
+        
+        def best_move(origin, dest, path=[], value=0, rec_level=2):
+            if rec_level == 0:
+                return path, value
+            sub_locs = sub_locations(origin, dest)
             
-            routes = [(origin, sum((weight+dest.distance(origin)*(1/GETTING_THERE_IMPORTANCE))/loc.distance(origin)**2+1 for loc, weight in locs_weights))] # we can just stay put, might be the best one.
-            for angle in usable_angles:
-                sub_dest = origin.towards(origin.add(Location(1000*math.cos(angle), 1000*math.sin(angle))), MOVE_SIZE)
-                routes.append((sub_dest, sum((weight+dest.distance(sub_dest)*(1/GETTING_THERE_IMPORTANCE))/loc.distance(sub_dest)**2+1 for loc, weight in locs_weights)))
-                # a tuple containing the next immediate destination and the its cost
-            return min([lowest_cost(r[0], dest, locs_weights, r[1], step0, rec_level-1, step0=step0) for r in routes], key=lambda r: r[1])
-            print routes
-            return min(routes, key=lambda r: r[1])
-
-        max_interpolation = 5
-        if self.p.get_location().distance(destination) > max_interpolation * MOVE_SIZE:
-            destination = self.p.get_location().towards(destination.get_location(), max_interpolation * MOVE_SIZE)
+            return max([best_move(subl, dest, path + [subl], value+move_value(origin, subl, dest, generate_weights(subl, len(path)+1)), rec_level-1) for subl in sub_locs], key=lambda x: x[1])
             
+        if isinstance(destination, list):
+            # find the best destination using simulations
+            dests_and_diffs = []
+            for possible_target in destination:
+                possible_target = possible_target.get_location()
+                loc = self.p.get_location()
+                difficulty = 0
+                turn = 0
+                while loc != possible_target:
+                    loc = loc.towards(possible_target, self.p.max_speed)
+                    difficulty += sum(lw[1]/(loc.distance(lw[0])+1)**THREAT_DECAY_RATE for lw in generate_weights(loc, turn))
+                    difficulty += sum(lw[1]/(loc.distance(lw[0])+1)**THREAT_DECAY_RATE for lw in generate_weights(loc, 0))
+                    # adding twice, both for the ones that will be there and the ones already there
+                    turn += 1
+                difficulty += turn*300 # TODO smarter way or a better value
+                dests_and_diffs.append((possible_target, difficulty))
+            destination = min(dests_and_diffs, key=lambda x: x[1])[0]
             
-        rec_level = self.p.get_location().distance(destination.get_location())//MOVE_SIZE + 2
-        cost, best_dest = lowest_cost(self.p.get_location(), destination.get_location(), locations_and_weights)
-        print cost
-        self.p.sail(best_dest)
+        route, value = best_move(origin=self.p.get_location(), dest=destination.get_location())
+        #print value
+        self.p.sail(route[0])
         
         
     def threats(self, turns_forward=3, rad=200):
@@ -258,24 +244,67 @@ class SmartPirate(object):
         enemy_pirates = game.get_enemy_living_pirates()
         my_motherships = game.get_my_motherships()
         enemy_motherships = game.get_enemy_motherships()
+        my_mines = [c.initial_location for c in my_capsules]
+        enemy_mines = [c.initial_location for c in enemy_capsules]
         asteroids = game.get_living_asteroids()
         
-        
+
         # first of all - if we're gonna lose, let's try to make them crash. Perhaps they're dumb.
         if game.get_myself().score + POINTS_LOSE_SUICIDE_THRESHOLD <= game.get_enemy().score or (
-                game.turn > TIME_LOSE_SUICIDE_THRESHOLD and game.get_myself.score() + TIME_LOSE_SUICIDE_POINT_THRESHOLD <= game.get_enemy().score):
+                game.turn > TIME_LOSE_SUICIDE_THRESHOLD and game.get_myself().score + TIME_LOSE_SUICIDE_POINT_THRESHOLD <= game.get_enemy().score):
             self.p.sail(closest_wall(self.p))
             return
-
+        print len(my_capsules)
+        if len(my_capsules) == 0: # one man army
+            if len(enemy_pirates) == 1:
+                if self.p.can_push(enemy_pirates[0]):
+                    self.p.push(enemy_pirates[0], closest_wall(enemy_pirates[0]))
+            else:
+                for ep in enemy_pirates:
+                    if ep.capsule is not None and self.p.can_push(ep):
+                        self.p.push(ep, closest_wall(ep))
+            return
+                
+        if self.p.capsule is not None:
+            # if I have a capsule
+            threats = self.threats(turns_forward=0, rad=PUSH_RANGE)
+            if len(threats) == 0:
+                self.smart_sail(my_motherships)
+            else:
+                for t in threats:
+                    if self.p.can_push(t):
+                        self.p.push(t, closest_wall(t))
+                        return
+                else:
+                    self.smart_sail(my_motherships)
+            return
+        # if I don't have a capsule
+        closest_capsule = closest(self.p, my_capsules)
+        index_from_capsule = sort_by_distance_from(my_pirates, closest_capsule).index(self.p)
+        if index_from_capsule == 0:
+            self.smart_sail(closest_capsule)
+        elif index_from_capsule > len(my_pirates)/2:
+            if closest(self.p, enemy_capsules).holder is not None:
+                # if their capsule has a holder
+                self.smart_sail(closest(self.p, enemy_capsules))
+            else:
+                self.smart_sail(closest(self.p, enemy_mines))
+        else:
+            self.smart_sail(closest(self.p, my_capsules))
+        return            
+        '''
         if sort_by_distance_from(my_capsules, self.p)[0].holder is not None:  # if we have the capsule
             if sort_by_distance_from(my_capsules, self.p)[0].holder == self.p:
-                self.smart_sail(sort_by_distance_from(my_motherships, self.p)[0])
+                self.smart_sail(my_motherships)
             else:
-                self.smart_sail(expected_location(my_capsules[0].holder, turns=2))
+                self.smart_sail(expected_location(my_capsules[0].holder))
         else:
-            self.smart_sail(sort_by_distance_from(my_capsules, self.p)[0])
-        
+            self.smart_sail(my_capsules)
 
+        for ep in enemy_pirates:
+            if ep.capsule is not None and self.p.can_push(ep):
+                self.p.push(ep, closest_wall(ep))
+        '''
         # TODO much more
         
         
@@ -303,7 +332,6 @@ class SmartPirate(object):
         
 
 def do_turn(game):
-    
     global previous_locations, current_locations, movement_vectors, GAME
     GAME = game
 
