@@ -58,4 +58,34 @@ class ScoreCapsule(Action):
     def score(self):
         return Action.distance_and_difficulty(self)*MODIFIERS['ScoreCapsule']
 
+class CommitSudoku(Action):
+    def __init__(self, p):
+        self.pirate = p
+        self.target = util.suicide_wall(p)
+    @staticmethod
+    def get_possible_actions(game):
+        return [CommitSudoku(pirate) for pirate in game.get_my_living_pirates()]
+    def get_participants(self):
+        return self.pirate
+    def score(self):
+        return Action.distance_score(self)*MODIFIERS['CommitSudoku']
+    def exec(self):
+        self.pirate.sail(self.target)
+
+class PushAsteroid(Action):
+    def __init__(self, g, p, a):
+        self.game = game
+        self.pirate = p
+        self.asteroid = a
+    @staticmethod
+    def get_possible_actions(game):
+        return [PushAsteroid(game, pirate, asteroid) for pirate in game.get_my_living_pirates() for asteroid in game.get_living_asteroids() if pirate.can_push(Asteroid)]
+    def get_participants(self):
+        return self.pirate, self.asteroid
+    def score(self):
+        # TODO
+        # Perhaps separate it into several classes (i.e KillWithAsteroid, DefendWithAsteroid, MoveAsteroid)?
+        pass
+    def exec(self):
+        pass
 
