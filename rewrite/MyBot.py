@@ -3,11 +3,6 @@ from utils import *
 util = Utils()
 
 class Action(object):
-    def __init__(self, game, pirate, target):
-        self.game = game
-        self.pirate = pirate
-        self.target = target
-    
     def cost(self):
         return distance_and_difficulty(self)
     
@@ -26,6 +21,41 @@ class Action(object):
 
     def distance_score(self):
         return self.pirate.get_location().distance(target.get_location())
+    
+    def get_possible_actions(game):
+        pass
+
+    def get_participants(self):
+        pass
 
 class FetchCapsule(Action):
-    pass
+    def __init__(self, g, p, c):
+        self.game = g
+        self.pirate = p
+        self.capsule = c
+    @staticmethod
+    def get_possible_actions(game):
+        return [FetchCapsule(game, pirate, capsule) for pirate in game.get_my_living_pirates() for capsule in game.get_my_capsules() if not (capsule.holder or pirate.capsule)]
+    def exec(self):
+        self.pirate.sail(self.capsule)
+    def get_participants(self):
+        return self.pirate, self.capsule
+    def score(self):
+        return Action.distance_and_difficulty(self)*MODIFIERS['FetchCapsule']
+
+class ScoreCapsule(Action):
+    def __init__(self, g, p, m):
+        self.game = g
+        self.pirate = p
+        self.mothership = m
+    @staticmethod
+    def get_possible_actions(game):
+        return [ScoreCapsule(game, pirate, mothership) for pirate in game.get_my_living_pirates() for mothership in game.get_my_motherships() if pirate.capsule]
+    def exec(self):
+        self.pirate.sail(self.mothership)
+    def get_participants(self):
+        return self.pirate # no need to put the mothership here, I guess
+    def score(self):
+        return Action.distance_and_difficulty(self)*MODIFIERS['ScoreCapsule']
+
+
