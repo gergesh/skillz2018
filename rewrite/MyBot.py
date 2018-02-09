@@ -2,6 +2,13 @@ from pirates import *
 from utils import *
 util = Utils()
 
+
+ACTIONS = [
+        FetchCapsule,
+        ScoreCapsule,
+        ]
+
+
 class Action(object):
     def cost(self):
         return distance_and_difficulty(self)
@@ -88,4 +95,21 @@ class PushAsteroid(Action):
         pass
     def exec(self):
         pass
+
+
+def do_turn(game):
+    
+    # get all possible actions
+    possible_actions = []
+    for a in ACTIONS:
+        possible_actions.append(a.get_possible_actions(game))
+    
+    # generate scores for each of them and sort by scores
+    possible_actions = sorted((a, a.get_participants()) for a in possible_actions, key=lambda x: x[0].score())
+
+    # do the best action, then filter the list.
+    while possible_actions:
+        action, participants = a.pop()
+        possible_actions = [act for act in possible_actions if all(p not in participants for p in act[1])]
+        action.exec()
 
